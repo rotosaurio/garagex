@@ -231,8 +231,35 @@ switch ($method) {
             $id_usuario = sanitize_input($data['id_usuario']);
         }
         
-        $sql = "INSERT INTO carros (id_usuario, marca, modelo, año, kilometraje) 
-                VALUES ('$id_usuario', '$marca', '$modelo', '$año', '$kilometraje')";
+        // Verificar si ya existe un registro similar creado recientemente (30 segundos)
+        $check_duplicate_sql = "SELECT id FROM carros 
+                                WHERE id_usuario = '$id_usuario' 
+                                AND marca = '$marca' 
+                                AND modelo = '$modelo' 
+                                AND año = '$año' 
+                                AND kilometraje = '$kilometraje' 
+                                AND created_at > DATE_SUB(NOW(), INTERVAL 30 SECOND)";
+        
+        $duplicate_result = mysqli_query($conn, $check_duplicate_sql);
+        
+        if ($duplicate_result && mysqli_num_rows($duplicate_result) > 0) {
+            // Ya existe un registro similar reciente, devolver ese ID en lugar de crear uno nuevo
+            $existing_car = mysqli_fetch_assoc($duplicate_result);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Vehículo registrado correctamente',
+                'id' => $existing_car['id'],
+                'info' => 'Se evitó la duplicación del registro'
+            ]);
+            break;
+        }
+        
+        // Calcular próximo cambio de aceite (10,000 km después del kilometraje actual)
+        $proximo_cambio = $kilometraje + 10000;
+        
+        // Insertar con los campos de seguimiento de cambios de aceite inicializados
+        $sql = "INSERT INTO carros (id_usuario, marca, modelo, año, kilometraje, proximo_cambio, contador_cambios, created_at) 
+                VALUES ('$id_usuario', '$marca', '$modelo', '$año', '$kilometraje', '$proximo_cambio', '0', NOW())";
         
         if (mysqli_query($conn, $sql)) {
             $new_id = mysqli_insert_id($conn);
@@ -253,12 +280,17 @@ switch ($method) {
     case 'PUT':
         // Actualizar un carro existente
         if (!$id) {
-            http_response_code(400);
-            echo json_encode([
-                'success' => false,
-                'message' => 'ID de vehículo no proporcionado'
-            ]);
-            break;
+            // Intentar obtener el ID desde los datos enviados
+            if (isset($data['id'])) {
+                $id = sanitize_input($data['id']);
+            } else {
+                http_response_code(400);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'ID de vehículo no proporcionado'
+                ]);
+                break;
+            }
         }
         
         // Verificar que el carro exista y el usuario tenga permisos
@@ -310,16 +342,6 @@ switch ($method) {
                 'success' => true,
                 'message' => 'Vehículo actualizado correctamente'
             ]);
-            
-            // Verificar si es necesario alertar de mantenimiento
-            if ($kilometraje >= 10000) {
-                echo json_encode([
-                    'success' => true,
-                    'message' => 'Vehículo actualizado correctamente',
-                    'maintenance_alert' => true,
-                    'maintenance_message' => "El vehículo $marca $modelo necesita un cambio de aceite."
-                ]);
-            }
         } else {
             http_response_code(500);
             echo json_encode([
@@ -332,13 +354,21 @@ switch ($method) {
     case 'DELETE':
         // Eliminar un carro
         if (!$id) {
-            http_response_code(400);
-            echo json_encode([
-                'success' => false,
-                'message' => 'ID de vehículo no proporcionado'
-            ]);
-            break;
+            // Intentar obtener el ID desde los datos enviados
+            if (isset($data['id'])) {
+                $id = sanitize_input($data['id']);
+            } else {
+                http_response_code(400);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'ID de vehículo no proporcionado'
+                ]);
+                break;
+            }
         }
+        
+        // Registrar información de depuración
+        error_log("DELETE vehículo: ID = " . $id);
         
         // Verificar que el carro exista y el usuario tenga permisos
         $check_sql = "SELECT * FROM carros WHERE id = '$id'";

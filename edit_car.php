@@ -108,7 +108,7 @@ include 'includes/header.php';
                     <h3 class="mb-0">Editar Vehículo</h3>
                 </div>
                 <div class="card-body">
-                    <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"] . '?id=' . $car_id . ($is_admin ? '&admin=1' : '')); ?>" method="post" class="needs-validation" novalidate>
+                    <form id="edit-car-form" class="needs-validation" novalidate data-id="<?php echo $car_id; ?>" data-admin="<?php echo $is_admin ? '1' : '0'; ?>">
                         <div class="mb-3">
                             <label for="marca" class="form-label">Marca</label>
                             <input type="text" class="form-control" id="marca" name="marca" value="<?php echo $car['marca']; ?>" required>
@@ -155,5 +155,80 @@ include 'includes/header.php';
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('edit-car-form');
+    const carId = form.getAttribute('data-id');
+    const isAdmin = form.getAttribute('data-admin') === '1';
+    
+    console.log("Formulario de edición cargado para ID:", carId);
+    
+    // Validación del kilometraje
+    const kilometrajeInput = document.getElementById('kilometraje');
+    if (kilometrajeInput) {
+        kilometrajeInput.addEventListener('input', function() {
+            const valor = parseInt(this.value);
+            const alertaMantenimiento = document.getElementById('alerta-mantenimiento');
+            
+            if (!isNaN(valor) && valor >= 10000 && alertaMantenimiento) {
+                alertaMantenimiento.classList.remove('d-none');
+            } else if (alertaMantenimiento) {
+                alertaMantenimiento.classList.add('d-none');
+            }
+        });
+    }
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (!form.checkValidity()) {
+            e.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
+        
+        // Obtener datos del formulario
+        const formData = new FormData(form);
+        const carData = {
+            id: carId, // Incluir el ID explícitamente
+            marca: document.getElementById('marca').value,
+            modelo: document.getElementById('modelo').value,
+            año: document.getElementById('año').value,
+            kilometraje: document.getElementById('kilometraje').value
+        };
+        
+        console.log("Enviando datos para actualizar:", carData);
+        
+        // Enviar datos a la API
+        fetch(`api/index.php?resource=cars&id=${carId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(carData)
+        })
+        .then(response => {
+            console.log("Respuesta del servidor:", response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log("Datos recibidos:", data);
+            if (data.success) {
+                // Redirigir según el rol
+                window.location.href = isAdmin ? 'admin_dashboard.php?success=1' : 'dashboard.php?success=1';
+            } else {
+                // Mostrar error
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error("Error en la actualización:", error);
+            alert('Error de conexión: ' + error);
+        });
+    });
+});
+</script>
 
 <?php include 'includes/footer.php'; ?> 

@@ -43,11 +43,47 @@ if (mysqli_query($conn, $sql)) {
         kilometraje INT(11) NOT NULL,
         fecha_ultimo_cambio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         notificado BOOLEAN DEFAULT 0,
+        proximo_cambio INT(11) DEFAULT 0,
+        contador_cambios INT(11) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE
     )";
     
     if (!mysqli_query($conn, $sql_cars)) {
         echo "ERROR: No se pudo ejecutar $sql_cars. " . mysqli_error($conn);
+    }
+    
+    // Verificar si los campos proximo_cambio y contador_cambios existen en la tabla carros
+    $check_fields = "SHOW COLUMNS FROM carros LIKE 'proximo_cambio'";
+    $result = mysqli_query($conn, $check_fields);
+    
+    if (mysqli_num_rows($result) == 0) {
+        // Agregar campos si no existen
+        $add_fields = "ALTER TABLE carros 
+                      ADD COLUMN proximo_cambio INT(11) DEFAULT 0,
+                      ADD COLUMN contador_cambios INT(11) DEFAULT 0";
+        
+        if (!mysqli_query($conn, $add_fields)) {
+            echo "ERROR: No se pudieron agregar campos a la tabla carros. " . mysqli_error($conn);
+        }
+        
+        // Actualizar valores existentes con próximo cambio a 10,000 km más del kilometraje actual
+        $update_existing = "UPDATE carros SET proximo_cambio = kilometraje + 10000 WHERE proximo_cambio = 0";
+        mysqli_query($conn, $update_existing);
+    }
+    
+    // Verificar si el campo created_at existe en la tabla carros
+    $check_created_at = "SHOW COLUMNS FROM carros LIKE 'created_at'";
+    $result = mysqli_query($conn, $check_created_at);
+    
+    if (mysqli_num_rows($result) == 0) {
+        // Agregar campo created_at si no existe
+        $add_created_at = "ALTER TABLE carros 
+                          ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP";
+        
+        if (!mysqli_query($conn, $add_created_at)) {
+            echo "ERROR: No se pudo agregar el campo created_at a la tabla carros. " . mysqli_error($conn);
+        }
     }
 
     // Verificar si existe usuario admin, si no, crearlo

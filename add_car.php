@@ -8,39 +8,16 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Procesar formulario
+// Redireccionar todas las solicitudes POST al procesamiento por API
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $marca = mysqli_real_escape_string($conn, $_POST['marca']);
-    $modelo = mysqli_real_escape_string($conn, $_POST['modelo']);
-    $año = mysqli_real_escape_string($conn, $_POST['año']);
-    $kilometraje = mysqli_real_escape_string($conn, $_POST['kilometraje']);
-    $id_usuario = $_SESSION['user_id'];
+    // No hacer nada aquí, dejamos que la API maneje la inserción
+    // El JavaScript se encargará de enviar los datos a la API
+    $_SESSION['message'] = "Por favor, espera mientras procesamos tu solicitud.";
+    $_SESSION['alert_type'] = "info";
     
-    // Validar campos
-    if (empty($marca) || empty($modelo) || empty($año) || empty($kilometraje)) {
-        $_SESSION['message'] = "Por favor, completa todos los campos.";
-        $_SESSION['alert_type'] = "danger";
-    } else {
-        // Insertar nuevo carro
-        $sql = "INSERT INTO carros (id_usuario, marca, modelo, año, kilometraje) 
-                VALUES ('$id_usuario', '$marca', '$modelo', '$año', '$kilometraje')";
-        
-        if (mysqli_query($conn, $sql)) {
-            $_SESSION['message'] = "Vehículo agregado correctamente.";
-            $_SESSION['alert_type'] = "success";
-            
-            // Verificar si es necesario mostrar alerta de mantenimiento
-            if ($kilometraje >= 10000) {
-                $_SESSION['maintenance_alert'] = "Tu vehículo $marca $modelo necesita un cambio de aceite.";
-            }
-            
-            header("Location: dashboard.php");
-            exit();
-        } else {
-            $_SESSION['message'] = "Error al agregar el vehículo: " . mysqli_error($conn);
-            $_SESSION['alert_type'] = "danger";
-        }
-    }
+    // Redirigir al dashboard (la inserción se hará vía JavaScript/API)
+    header("Location: dashboard.php");
+    exit();
 }
 
 // Incluir header
@@ -128,15 +105,21 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Obtener datos del formulario
-        const formData = new FormData(form);
-        const carData = {};
-        formData.forEach((value, key) => {
-            carData[key] = value;
-        });
+        // Obtener datos del formulario de manera segura sin clonar el objeto DOM
+        const carData = {
+            marca: document.getElementById('marca').value,
+            modelo: document.getElementById('modelo').value,
+            año: document.getElementById('año').value,
+            kilometraje: document.getElementById('kilometraje').value
+        };
+        
+        // Deshabilitar el botón de envío para prevenir múltiples envíos
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
         
         // Enviar datos a la API
-        fetch('api/cars', {
+        fetch('api/index.php?resource=cars', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -152,10 +135,16 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 // Mostrar error
                 alert('Error: ' + data.message);
+                // Rehabilitar el botón
+                submitButton.disabled = false;
+                submitButton.innerHTML = '<i class="fas fa-save"></i> Guardar Vehículo';
             }
         })
         .catch(error => {
             alert('Error de conexión: ' + error);
+            // Rehabilitar el botón
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<i class="fas fa-save"></i> Guardar Vehículo';
         });
     });
     

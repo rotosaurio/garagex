@@ -17,17 +17,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     e.preventDefault();
                     const carId = this.getAttribute('data-id');
+                    console.log("Eliminando carro ID:", carId);
                     
                     // Usar Fetch para eliminar el carro (API REST DELETE)
-                    fetch(`api/cars/${carId}`, {
+                    fetch(`api/index.php?resource=cars&id=${carId}`, {
                         method: 'DELETE',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest'
-                        }
+                        },
+                        // Añadir body vacío para asegurar que la solicitud DELETE sea completa
+                        body: JSON.stringify({id: carId})
                     })
-                    .then(response => response.json())
+                    .then(response => {
+                        console.log("Respuesta recibida:", response.status);
+                        return response.json();
+                    })
                     .then(data => {
+                        console.log("Datos recibidos:", data);
                         if (data.success) {
                             // Eliminar la fila de la tabla sin recargar la página
                             const row = this.closest('tr');
@@ -45,6 +52,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     })
                     .catch(error => {
+                        console.error("Error en la eliminación:", error);
                         showAlert('Error de conexión: ' + error, 'danger');
                     });
                 }
@@ -95,7 +103,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Determinar si es una actualización o creación
                     const carId = form.getAttribute('data-id');
                     const method = carId ? 'PUT' : 'POST';
-                    const url = carId ? `api/cars/${carId}` : 'api/cars';
+                    const url = carId ? `api/index.php?resource=cars&id=${carId}` : 'api/index.php?resource=cars';
+                    
+                    console.log("Enviando datos:", method, url, carData);
                     
                     // Usar Fetch para enviar los datos (API REST POST/PUT)
                     fetch(url, {
@@ -106,8 +116,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         body: JSON.stringify(carData)
                     })
-                    .then(response => response.json())
+                    .then(response => {
+                        console.log("Respuesta:", response.status);
+                        return response.json();
+                    })
                     .then(data => {
+                        console.log("Datos recibidos:", data);
                         if (data.success) {
                             // Redirigir al dashboard
                             window.location.href = 'dashboard.php?success=1';
@@ -116,6 +130,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     })
                     .catch(error => {
+                        console.error("Error en la operación:", error);
                         showAlert('Error de conexión: ' + error, 'danger');
                     });
                 }
@@ -240,7 +255,7 @@ function initSearchCombos() {
     // Combo de búsqueda de usuarios (llave primaria)
     const userSearchCombo = document.getElementById('user-search');
     if (userSearchCombo) {
-        fetch('api/users', {
+        fetch('api/index.php?resource=users', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -280,7 +295,7 @@ function initSearchCombos() {
     const marcaSearchCombo = document.getElementById('marca-search');
     if (marcaSearchCombo) {
         // Obtener marcas únicas desde la API
-        fetch('api/cars/marcas', {
+        fetch('api/index.php?resource=cars&action=marcas', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -316,7 +331,7 @@ function initSearchCombos() {
 
 // Cargar los carros de un usuario
 function loadUserCars(userId) {
-    fetch(`api/users/${userId}/cars`, {
+    fetch(`api/index.php?resource=users&id=${userId}&action=cars`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -398,23 +413,34 @@ function updateCarsTable(cars) {
             } else {
                 e.preventDefault();
                 const carId = this.getAttribute('data-id');
+                console.log("Eliminando carro ID:", carId);
                 
                 // Usar Fetch para eliminar el carro
-                fetch(`api/cars/${carId}`, {
+                fetch(`api/index.php?resource=cars&id=${carId}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
-                    }
+                    },
+                    // Añadir body vacío para asegurar que la solicitud DELETE sea completa
+                    body: JSON.stringify({id: carId})
                 })
-                .then(response => response.json())
+                .then(response => {
+                    console.log("Respuesta recibida:", response.status);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log("Datos recibidos:", data);
                     if (data.success) {
                         this.closest('tr').remove();
                         showAlert('Vehículo eliminado correctamente', 'success');
                     } else {
                         showAlert('Error al eliminar el vehículo: ' + data.message, 'danger');
                     }
+                })
+                .catch(error => {
+                    console.error("Error en la eliminación:", error);
+                    showAlert('Error de conexión: ' + error, 'danger');
                 });
             }
         });
@@ -425,10 +451,33 @@ function updateCarsTable(cars) {
 function initDynamicTables() {
     const carsTable = document.getElementById('cars-table');
     if (carsTable) {
-        // Inicializar DataTables para tablas dinámicas
+        // Inicializar DataTables con retrieve:true para manejar reinicializaciones
+        // Usar una configuración de idioma local para evitar problemas CORS
         $(carsTable).DataTable({
+            retrieve: true,
             "language": {
-                "url": "//cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json"
+                "decimal": "",
+                "emptyTable": "No hay datos disponibles en la tabla",
+                "info": "Mostrando _START_ a _END_ de _TOTAL_ registros",
+                "infoEmpty": "Mostrando 0 a 0 de 0 registros",
+                "infoFiltered": "(filtrado de _MAX_ registros totales)",
+                "infoPostFix": "",
+                "thousands": ",",
+                "lengthMenu": "Mostrar _MENU_ registros",
+                "loadingRecords": "Cargando...",
+                "processing": "Procesando...",
+                "search": "Buscar:",
+                "zeroRecords": "No se encontraron registros coincidentes",
+                "paginate": {
+                    "first": "Primero",
+                    "last": "Último",
+                    "next": "Siguiente",
+                    "previous": "Anterior"
+                },
+                "aria": {
+                    "sortAscending": ": activar para ordenar la columna ascendente",
+                    "sortDescending": ": activar para ordenar la columna descendente"
+                }
             },
             "responsive": true,
             "order": [[0, "desc"]]

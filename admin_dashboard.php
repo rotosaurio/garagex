@@ -287,19 +287,36 @@ document.addEventListener('DOMContentLoaded', function() {
         allowClear: true
     });
     
-    // Inicializar DataTables solo si no está ya inicializada
-    let carsTable;
-    if (!$.fn.DataTable.isDataTable('#cars-table')) {
-        carsTable = $('#cars-table').DataTable({
-            language: {
-                url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json"
+    // Inicializar DataTables con retrieve:true para manejar reinicializaciones
+    let carsTable = $('#cars-table').DataTable({
+        retrieve: true,
+        language: {
+            "decimal": "",
+            "emptyTable": "No hay datos disponibles en la tabla",
+            "info": "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            "infoEmpty": "Mostrando 0 a 0 de 0 registros",
+            "infoFiltered": "(filtrado de _MAX_ registros totales)",
+            "infoPostFix": "",
+            "thousands": ",",
+            "lengthMenu": "Mostrar _MENU_ registros",
+            "loadingRecords": "Cargando...",
+            "processing": "Procesando...",
+            "search": "Buscar:",
+            "zeroRecords": "No se encontraron registros coincidentes",
+            "paginate": {
+                "first": "Primero",
+                "last": "Último",
+                "next": "Siguiente",
+                "previous": "Anterior"
             },
-            responsive: true,
-            order: [[0, "desc"]]
-        });
-    } else {
-        carsTable = $('#cars-table').DataTable();
-    }
+            "aria": {
+                "sortAscending": ": activar para ordenar la columna ascendente",
+                "sortDescending": ": activar para ordenar la columna descendente"
+            }
+        },
+        responsive: true,
+        order: [[0, "desc"]]
+    });
     
     // Cargar usuarios
     $.ajax({
