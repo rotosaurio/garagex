@@ -65,7 +65,13 @@ switch ($method) {
                     $stats['total_cambios'] += $car['contador_cambios'];
                     
                     // Verificar si está próximo a un cambio (si le faltan menos de 1000 km)
-                    if (($car['proximo_cambio'] - $car['kilometraje']) < 1000 && $car['kilometraje'] < $car['proximo_cambio']) {
+                    $necesita_cambio = $car['kilometraje'] >= $car['proximo_cambio'] || 
+                                      ($car['kilometraje'] >= 10000 && $car['contador_cambios'] == 0);
+                    $proximo_cambio = ($car['proximo_cambio'] - $car['kilometraje']) < 1000 && 
+                                    $car['kilometraje'] < $car['proximo_cambio'] &&
+                                    !$necesita_cambio;
+                    
+                    if ($proximo_cambio) {
                         $stats['proximos_cambios']++;
                     }
                     
@@ -76,7 +82,8 @@ switch ($method) {
                         'kilometraje' => $car['kilometraje'],
                         'contador_cambios' => $car['contador_cambios'],
                         'proximo_cambio' => $car['proximo_cambio'],
-                        'km_faltantes' => max(0, $car['proximo_cambio'] - $car['kilometraje'])
+                        'km_faltantes' => max(0, $car['proximo_cambio'] - $car['kilometraje']),
+                        'necesita_cambio' => $necesita_cambio
                     ];
                 }
                 

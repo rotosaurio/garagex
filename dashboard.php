@@ -20,7 +20,13 @@ $sql = "SELECT * FROM carros WHERE id_usuario = '$user_id'";
 $result = mysqli_query($conn, $sql);
 
 // Verificar notificaciones de mantenimiento
-$maintenance_sql = "SELECT * FROM carros WHERE id_usuario = '$user_id' AND kilometraje >= proximo_cambio AND notificado = 0";
+// Consideramos que un vehículo necesita mantenimiento si:
+// 1. El kilometraje es mayor o igual al próximo cambio programado, o
+// 2. El kilometraje es mayor o igual a 10,000 km y nunca se ha registrado un cambio (contador_cambios = 0)
+$maintenance_sql = "SELECT * FROM carros WHERE id_usuario = '$user_id' AND 
+                   ((kilometraje >= proximo_cambio) OR 
+                   (kilometraje >= 10000 AND contador_cambios = 0)) AND 
+                   notificado = 0";
 $maintenance_result = mysqli_query($conn, $maintenance_sql);
 
 if (mysqli_num_rows($maintenance_result) > 0) {
@@ -98,7 +104,7 @@ include 'includes/header.php';
                             <td><?php echo number_format($car['kilometraje'], 0, ',', '.'); ?> km</td>
                             <td><?php echo date('d/m/Y', strtotime($car['fecha_ultimo_cambio'])); ?></td>
                             <td>
-                                <?php if ($car['kilometraje'] >= $car['proximo_cambio']): ?>
+                                <?php if ($car['kilometraje'] >= $car['proximo_cambio'] || ($car['kilometraje'] >= 10000 && $car['contador_cambios'] == 0)): ?>
                                     <span class="badge bg-danger">Cambio pendiente</span>
                                 <?php elseif (($car['proximo_cambio'] - $car['kilometraje']) < 1000): ?>
                                     <span class="badge bg-warning text-dark">Próximo al cambio</span>
@@ -114,7 +120,7 @@ include 'includes/header.php';
                                     <a href="edit_car.php?id=<?php echo $car['id']; ?>" class="btn btn-sm btn-primary" data-bs-toggle="tooltip" title="Editar">
                                         <i class="fas fa-edit"></i>
                                     </a>
-                                    <?php if ($car['kilometraje'] >= $car['proximo_cambio']): ?>
+                                    <?php if ($car['kilometraje'] >= $car['proximo_cambio'] || ($car['kilometraje'] >= 10000 && $car['contador_cambios'] == 0)): ?>
                                         <a href="view_car.php?id=<?php echo $car['id']; ?>" class="btn btn-sm btn-success" data-bs-toggle="tooltip" title="Registrar cambio de aceite">
                                             <i class="fas fa-oil-can"></i>
                                         </a>
@@ -156,8 +162,25 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         success: function(data) {
             if (data.success) {
+                // Reiniciar el selector completamente
                 const marcaSelect = document.getElementById('marca-search');
+                marcaSelect.innerHTML = '<option value="">Todas las marcas</option>';
+                
+                // Crear un objeto para almacenar marcas únicas
+                const uniqueMarcasByName = {};
+                
+                // Añadir cada marca al objeto (solo se guardará una por nombre)
                 data.marcas.forEach(marca => {
+                    uniqueMarcasByName[marca] = marca;
+                });
+                
+                // Convertir los valores del objeto a un array y ordenarlos alfabéticamente
+                const uniqueMarcas = Object.values(uniqueMarcasByName).sort((a, b) => 
+                    a.localeCompare(b)
+                );
+                
+                // Añadir las marcas únicas ordenadas al selector
+                uniqueMarcas.forEach(marca => {
                     const option = document.createElement('option');
                     option.value = marca;
                     option.textContent = marca;
@@ -178,7 +201,10 @@ document.addEventListener('DOMContentLoaded', function() {
             rows.forEach(row => {
                 const kilometraje = parseInt(row.getAttribute('data-kilometraje'));
                 if (this.checked) {
-                    row.style.display = kilometraje >= 10000 ? '' : 'none';
+                    // Mostrar vehículos con kilometraje mayor o igual a 10,000 km o 15,000 km si nunca han tenido cambio
+                    const carId = row.getAttribute('data-id');
+                    const needsMaintenance = row.querySelector('.badge.bg-danger') !== null;
+                    row.style.display = needsMaintenance ? '' : 'none';
                 } else {
                     row.style.display = '';
                 }

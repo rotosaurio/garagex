@@ -30,7 +30,10 @@ $total_cars_sql = "SELECT COUNT(*) as total FROM carros";
 $total_cars_result = mysqli_query($conn, $total_cars_sql);
 $total_cars = mysqli_fetch_assoc($total_cars_result)['total'];
 
-$maintenance_needed_sql = "SELECT COUNT(*) as total FROM carros WHERE kilometraje >= 10000";
+// Consideramos que un vehículo necesita mantenimiento si:
+// 1. El kilometraje es mayor o igual al próximo cambio programado, o
+// 2. El kilometraje es mayor o igual a 10,000 km y nunca se ha registrado un cambio (contador_cambios = 0)
+$maintenance_needed_sql = "SELECT COUNT(*) as total FROM carros WHERE (kilometraje >= proximo_cambio) OR (kilometraje >= 10000 AND contador_cambios = 0)";
 $maintenance_needed_result = mysqli_query($conn, $maintenance_needed_sql);
 $maintenance_needed = mysqli_fetch_assoc($maintenance_needed_result)['total'];
 
@@ -137,9 +140,9 @@ include 'includes/header.php';
                                 <td><?php echo $car['año']; ?></td>
                                 <td><?php echo number_format($car['kilometraje'], 0, ',', '.'); ?> km</td>
                                 <td>
-                                    <?php if ($car['kilometraje'] >= 10000): ?>
+                                    <?php if ($car['kilometraje'] >= $car['proximo_cambio'] || ($car['kilometraje'] >= 10000 && $car['contador_cambios'] == 0)): ?>
                                         <span class="badge bg-danger">Cambio pendiente</span>
-                                    <?php elseif ($car['kilometraje'] >= 9000): ?>
+                                    <?php elseif (($car['proximo_cambio'] - $car['kilometraje']) < 1000): ?>
                                         <span class="badge bg-warning text-dark">Próximo al cambio</span>
                                     <?php else: ?>
                                         <span class="badge bg-success">Al día</span>
@@ -328,8 +331,25 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         success: function(data) {
             if (data.success) {
+                // Reiniciar el selector completamente
                 const userSelect = document.getElementById('user-search');
+                userSelect.innerHTML = '<option value="">Todos los usuarios</option>';
+                
+                // Crear un objeto para almacenar usuarios únicos por nombre
+                const uniqueUsersByName = {};
+                
+                // Añadir cada usuario al objeto (solo se guardará uno por nombre)
                 data.users.forEach(user => {
+                    uniqueUsersByName[user.nombre] = user;
+                });
+                
+                // Convertir los valores del objeto a un array y ordenarlos por nombre
+                const uniqueUsers = Object.values(uniqueUsersByName).sort((a, b) => 
+                    a.nombre.localeCompare(b.nombre)
+                );
+                
+                // Añadir los usuarios únicos ordenados al selector
+                uniqueUsers.forEach(user => {
                     const option = document.createElement('option');
                     option.value = user.nombre;
                     option.textContent = user.nombre;
@@ -337,7 +357,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 
                 // Evento de cambio
-                $('#user-search').on('change', function() {
+                $('#user-search').off('change').on('change', function() {
                     const userName = this.value;
                     
                     if (userName) {
@@ -363,8 +383,25 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         success: function(data) {
             if (data.success) {
+                // Reiniciar el selector completamente
                 const marcaSelect = document.getElementById('marca-search');
+                marcaSelect.innerHTML = '<option value="">Todas las marcas</option>';
+                
+                // Crear un objeto para almacenar marcas únicas
+                const uniqueMarcasByName = {};
+                
+                // Añadir cada marca al objeto (solo se guardará una por nombre)
                 data.marcas.forEach(marca => {
+                    uniqueMarcasByName[marca] = marca;
+                });
+                
+                // Convertir los valores del objeto a un array y ordenarlos alfabéticamente
+                const uniqueMarcas = Object.values(uniqueMarcasByName).sort((a, b) => 
+                    a.localeCompare(b)
+                );
+                
+                // Añadir las marcas únicas ordenadas al selector
+                uniqueMarcas.forEach(marca => {
                     const option = document.createElement('option');
                     option.value = marca;
                     option.textContent = marca;
@@ -372,7 +409,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 
                 // Evento de cambio
-                $('#marca-search').on('change', function() {
+                $('#marca-search').off('change').on('change', function() {
                     const marca = this.value;
                     
                     if (marca) {
@@ -489,7 +526,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <td>
                             `;
                             
-                            if (car.kilometraje >= car.proximo_cambio) {
+                            if (car.kilometraje >= car.proximo_cambio || (car.kilometraje >= 10000 && car.contador_cambios == 0)) {
                                 html += `<span class="badge bg-danger">Cambio pendiente</span>`;
                             } else if (car.km_faltantes < 1000) {
                                 html += `<span class="badge bg-warning text-dark">Próximo (${car.km_faltantes} km)</span>`;
