@@ -20,7 +20,7 @@ $sql = "SELECT * FROM carros WHERE id_usuario = '$user_id'";
 $result = mysqli_query($conn, $sql);
 
 // Verificar notificaciones de mantenimiento
-$maintenance_sql = "SELECT * FROM carros WHERE id_usuario = '$user_id' AND kilometraje >= 10000 AND notificado = 0";
+$maintenance_sql = "SELECT * FROM carros WHERE id_usuario = '$user_id' AND kilometraje >= proximo_cambio AND notificado = 0";
 $maintenance_result = mysqli_query($conn, $maintenance_sql);
 
 if (mysqli_num_rows($maintenance_result) > 0) {
@@ -45,53 +45,147 @@ include 'includes/header.php';
 ?>
 
 <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Mis Vehículos</h2>
-        <a href="add_car.php" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Agregar Vehículo
-        </a>
-    </div>
-    
-    <?php if (mysqli_num_rows($result) > 0): ?>
-        <div class="row">
-            <?php while ($car = mysqli_fetch_assoc($result)): ?>
-                <div class="col-md-4">
-                    <div class="card car-card">
-                        <div class="card-body">
-                            <h5 class="card-title"><?php echo $car['marca'] . ' ' . $car['modelo']; ?></h5>
-                            <p class="card-text">
-                                <strong>Año:</strong> <?php echo $car['año']; ?><br>
-                                <strong>Kilometraje:</strong> <?php echo number_format($car['kilometraje'], 0, ',', '.'); ?> km<br>
-                                <strong>Último cambio:</strong> <?php echo date('d/m/Y', strtotime($car['fecha_ultimo_cambio'])); ?>
-                            </p>
-                            
-                            <?php if ($car['kilometraje'] >= 10000): ?>
-                                <div class="alert alert-maintenance mb-3" role="alert">
-                                    <i class="fas fa-exclamation-triangle"></i> ¡Es tiempo de cambiar el aceite!
-                                </div>
-                            <?php endif; ?>
-                            
-                            <div class="d-flex justify-content-between">
-                                <a href="edit_car.php?id=<?php echo $car['id']; ?>" class="btn btn-sm btn-info">
-                                    <i class="fas fa-edit"></i> Editar
-                                </a>
-                                <a href="view_car.php?id=<?php echo $car['id']; ?>" class="btn btn-sm btn-secondary">
-                                    <i class="fas fa-eye"></i> Ver detalles
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            <?php endwhile; ?>
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-car"></i> Mis Vehículos</h2>
         </div>
-    <?php else: ?>
-        <div class="alert alert-info" role="alert">
-            <p>Aún no has registrado ningún vehículo. ¡Comienza agregando uno!</p>
+        <div class="col-md-4 text-end">
             <a href="add_car.php" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Agregar Vehículo
             </a>
         </div>
+    </div>
+    
+    <?php if (mysqli_num_rows($result) > 0): ?>
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <label for="marca-search" class="form-label">Filtrar por marca:</label>
+                <select id="marca-search" class="form-select">
+                    <option value="">Todas las marcas</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" id="filter-maintenance">
+                    <label class="form-check-label" for="filter-maintenance">
+                        Mostrar solo vehículos que necesitan mantenimiento
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table id="cars-table" class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Marca</th>
+                        <th>Modelo</th>
+                        <th>Año</th>
+                        <th>Kilometraje</th>
+                        <th>Último Cambio</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php while ($car = mysqli_fetch_assoc($result)): ?>
+                        <tr data-id="<?php echo $car['id']; ?>" data-kilometraje="<?php echo $car['kilometraje']; ?>">
+                            <td><?php echo $car['id']; ?></td>
+                            <td><?php echo htmlspecialchars($car['marca']); ?></td>
+                            <td><?php echo htmlspecialchars($car['modelo']); ?></td>
+                            <td><?php echo $car['año']; ?></td>
+                            <td><?php echo number_format($car['kilometraje'], 0, ',', '.'); ?> km</td>
+                            <td><?php echo date('d/m/Y', strtotime($car['fecha_ultimo_cambio'])); ?></td>
+                            <td>
+                                <?php if ($car['kilometraje'] >= $car['proximo_cambio']): ?>
+                                    <span class="badge bg-danger">Cambio pendiente</span>
+                                <?php elseif (($car['proximo_cambio'] - $car['kilometraje']) < 1000): ?>
+                                    <span class="badge bg-warning text-dark">Próximo al cambio</span>
+                                <?php else: ?>
+                                    <span class="badge bg-success">Al día</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="view_car.php?id=<?php echo $car['id']; ?>" class="btn btn-sm btn-info" data-bs-toggle="tooltip" title="Ver detalles">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="edit_car.php?id=<?php echo $car['id']; ?>" class="btn btn-sm btn-primary" data-bs-toggle="tooltip" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <?php if ($car['kilometraje'] >= $car['proximo_cambio']): ?>
+                                        <a href="view_car.php?id=<?php echo $car['id']; ?>" class="btn btn-sm btn-success" data-bs-toggle="tooltip" title="Registrar cambio de aceite">
+                                            <i class="fas fa-oil-can"></i>
+                                        </a>
+                                    <?php endif; ?>
+                                    <button class="btn btn-sm btn-danger delete-car" data-id="<?php echo $car['id']; ?>" data-bs-toggle="tooltip" title="Eliminar">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php else: ?>
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> No tienes vehículos registrados. 
+            <a href="add_car.php" class="alert-link">¡Agrega tu primer vehículo ahora!</a>
+        </div>
     <?php endif; ?>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar Select2 para el filtro de marcas
+    $('#marca-search').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Selecciona una marca',
+        allowClear: true
+    });
+    
+    // Cargar marcas desde la API
+    $.ajax({
+        url: 'api/index.php?resource=cars&action=marcas',
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        success: function(data) {
+            if (data.success) {
+                const marcaSelect = document.getElementById('marca-search');
+                data.marcas.forEach(marca => {
+                    const option = document.createElement('option');
+                    option.value = marca;
+                    option.textContent = marca;
+                    marcaSelect.appendChild(option);
+                });
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("Error al cargar marcas:", error);
+        }
+    });
+    
+    // Filtro de mantenimiento
+    const filterMaintenance = document.getElementById('filter-maintenance');
+    if (filterMaintenance) {
+        filterMaintenance.addEventListener('change', function() {
+            const rows = document.querySelectorAll('#cars-table tbody tr');
+            rows.forEach(row => {
+                const kilometraje = parseInt(row.getAttribute('data-kilometraje'));
+                if (this.checked) {
+                    row.style.display = kilometraje >= 10000 ? '' : 'none';
+                } else {
+                    row.style.display = '';
+                }
+            });
+        });
+    }
+});
+</script>
 
 <?php include 'includes/footer.php'; ?> 

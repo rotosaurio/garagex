@@ -15,7 +15,7 @@ if ($_SESSION['role'] !== 'admin') {
 }
 
 // Obtener todos los carros
-$sql = "SELECT c.*, u.nombre as nombre_usuario 
+$sql = "SELECT c.*, u.nombre as nombre_usuario, u.id as usuario_id 
         FROM carros c 
         JOIN usuarios u ON c.id_usuario = u.id 
         ORDER BY c.kilometraje DESC";
@@ -39,11 +39,20 @@ include 'includes/header.php';
 ?>
 
 <div class="container py-4">
-    <h2 class="mb-4">Panel de Administración</h2>
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-tachometer-alt"></i> Panel de Administración</h2>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="add_car.php" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Agregar Vehículo
+            </a>
+        </div>
+    </div>
     
-    <!-- Estadísticas -->
+    <!-- Tarjetas de estadísticas -->
     <div class="row dashboard-stats">
-        <div class="col-md-4">
+        <div class="col-md-4 mb-4">
             <div class="stats-card bg-primary text-white">
                 <div class="stats-icon">
                     <i class="fas fa-users"></i>
@@ -52,90 +61,578 @@ include 'includes/header.php';
                 <p>Usuarios Registrados</p>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 mb-4">
             <div class="stats-card bg-success text-white">
                 <div class="stats-icon">
                     <i class="fas fa-car"></i>
                 </div>
                 <h3><?php echo $total_cars; ?></h3>
-                <p>Vehículos Registrados</p>
+                <p>Vehículos en Sistema</p>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="stats-card bg-warning text-dark">
+        <div class="col-md-4 mb-4">
+            <div class="stats-card bg-danger text-white">
                 <div class="stats-icon">
-                    <i class="fas fa-oil-can"></i>
+                    <i class="fas fa-tools"></i>
                 </div>
                 <h3><?php echo $maintenance_needed; ?></h3>
-                <p>Vehículos que Necesitan Mantenimiento</p>
+                <p>Necesitan Mantenimiento</p>
             </div>
         </div>
     </div>
     
-    <!-- Lista de Carros -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="mb-0">Todos los Vehículos</h3>
-        </div>
-        <div class="card-body">
-            <?php if (mysqli_num_rows($result) > 0): ?>
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Usuario</th>
-                                <th>Marca</th>
-                                <th>Modelo</th>
-                                <th>Año</th>
-                                <th>Kilometraje</th>
-                                <th>Último Cambio</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
+    <!-- Tabs para diferentes reportes -->
+    <ul class="nav nav-tabs mb-4" id="reportTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="cars-tab" data-bs-toggle="tab" data-bs-target="#cars-tab-pane" type="button" role="tab" aria-controls="cars-tab-pane" aria-selected="true">
+                <i class="fas fa-list"></i> Vehículos
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="reports-tab" data-bs-toggle="tab" data-bs-target="#reports-tab-pane" type="button" role="tab" aria-controls="reports-tab-pane" aria-selected="false">
+                <i class="fas fa-chart-bar"></i> Reportes
+            </button>
+        </li>
+    </ul>
+    
+    <div class="tab-content" id="reportTabsContent">
+        <!-- Tab de vehículos -->
+        <div class="tab-pane fade show active" id="cars-tab-pane" role="tabpanel" aria-labelledby="cars-tab" tabindex="0">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <label for="user-search" class="form-label">Filtrar por usuario:</label>
+                    <select id="user-search" class="form-select">
+                        <option value="">Todos los usuarios</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="marca-search" class="form-label">Filtrar por marca:</label>
+                    <select id="marca-search" class="form-select">
+                        <option value="">Todas las marcas</option>
+                    </select>
+                </div>
+            </div>
+        
+            <div class="table-responsive">
+                <table id="cars-table" class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Usuario</th>
+                            <th>Marca</th>
+                            <th>Modelo</th>
+                            <th>Año</th>
+                            <th>Kilometraje</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php while ($car = mysqli_fetch_assoc($result)): ?>
+                            <tr data-id="<?php echo $car['id']; ?>" data-kilometraje="<?php echo $car['kilometraje']; ?>" data-user="<?php echo $car['nombre_usuario']; ?>">
+                                <td><?php echo $car['id']; ?></td>
+                                <td><?php echo htmlspecialchars($car['nombre_usuario']); ?></td>
+                                <td><?php echo htmlspecialchars($car['marca']); ?></td>
+                                <td><?php echo htmlspecialchars($car['modelo']); ?></td>
+                                <td><?php echo $car['año']; ?></td>
+                                <td><?php echo number_format($car['kilometraje'], 0, ',', '.'); ?> km</td>
+                                <td>
+                                    <?php if ($car['kilometraje'] >= 10000): ?>
+                                        <span class="badge bg-danger">Cambio pendiente</span>
+                                    <?php elseif ($car['kilometraje'] >= 9000): ?>
+                                        <span class="badge bg-warning text-dark">Próximo al cambio</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-success">Al día</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="view_car.php?id=<?php echo $car['id']; ?>&admin=1" class="btn btn-sm btn-info" data-bs-toggle="tooltip" title="Ver detalles">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="edit_car.php?id=<?php echo $car['id']; ?>&admin=1" class="btn btn-sm btn-primary" data-bs-toggle="tooltip" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-danger delete-car" data-id="<?php echo $car['id']; ?>" data-bs-toggle="tooltip" title="Eliminar">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            <?php while ($car = mysqli_fetch_assoc($result)): ?>
-                                <tr>
-                                    <td><?php echo $car['id']; ?></td>
-                                    <td><?php echo $car['nombre_usuario']; ?></td>
-                                    <td><?php echo $car['marca']; ?></td>
-                                    <td><?php echo $car['modelo']; ?></td>
-                                    <td><?php echo $car['año']; ?></td>
-                                    <td><?php echo number_format($car['kilometraje'], 0, ',', '.'); ?> km</td>
-                                    <td><?php echo date('d/m/Y', strtotime($car['fecha_ultimo_cambio'])); ?></td>
-                                    <td>
-                                        <?php if ($car['kilometraje'] >= 10000): ?>
-                                            <span class="badge bg-danger">Cambio de Aceite</span>
-                                        <?php else: ?>
-                                            <span class="badge bg-success">OK</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group" role="group">
-                                            <a href="edit_car.php?id=<?php echo $car['id']; ?>&admin=1" class="btn btn-sm btn-info" data-bs-toggle="tooltip" title="Editar">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <a href="view_car.php?id=<?php echo $car['id']; ?>&admin=1" class="btn btn-sm btn-secondary" data-bs-toggle="tooltip" title="Ver">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            <a href="delete_car.php?id=<?php echo $car['id']; ?>" class="btn btn-sm btn-danger delete-car" data-bs-toggle="tooltip" title="Eliminar">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endwhile; ?>
-                        </tbody>
-                    </table>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Tab de reportes -->
+        <div class="tab-pane fade" id="reports-tab-pane" role="tabpanel" aria-labelledby="reports-tab" tabindex="0">
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-users"></i> Estadísticas de Usuarios</h5>
+                        </div>
+                        <div class="card-body" id="users-report">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <p class="mt-2">Cargando datos...</p>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button type="button" class="btn btn-primary btn-sm" onclick="loadReport('usuarios')">
+                                <i class="fas fa-sync-alt"></i> Actualizar
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            <?php else: ?>
-                <div class="alert alert-info" role="alert">
-                    No hay vehículos registrados en el sistema.
+                
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-car"></i> Estadísticas de Vehículos</h5>
+                        </div>
+                        <div class="card-body" id="cars-report">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-success" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <p class="mt-2">Cargando datos...</p>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button type="button" class="btn btn-success btn-sm" onclick="loadReport('carros')">
+                                <i class="fas fa-sync-alt"></i> Actualizar
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            <?php endif; ?>
+                
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-danger text-white">
+                            <h5 class="mb-0"><i class="fas fa-tools"></i> Estadísticas de Mantenimiento</h5>
+                        </div>
+                        <div class="card-body" id="maintenance-report">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-danger" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <p class="mt-2">Cargando datos...</p>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button type="button" class="btn btn-danger btn-sm" onclick="loadReport('mantenimiento')">
+                                <i class="fas fa-sync-alt"></i> Actualizar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nuevo reporte de cambios de aceite por usuario -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-secondary text-white">
+                            <h4 class="mb-0"><i class="fas fa-oil-can"></i> Cambios de Aceite por Usuario</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="cambios-usuario-select" class="form-label">Seleccionar Usuario:</label>
+                                    <select id="cambios-usuario-select" class="form-select">
+                                        <option value="">Selecciona un usuario</option>
+                                        <?php
+                                        // Obtener usuarios con vehículos
+                                        $users_sql = "SELECT DISTINCT u.id, u.nombre 
+                                                    FROM usuarios u 
+                                                    JOIN carros c ON u.id = c.id_usuario 
+                                                    WHERE u.role = 'usuario' 
+                                                    ORDER BY u.nombre";
+                                        $users_result = mysqli_query($conn, $users_sql);
+                                        while ($user = mysqli_fetch_assoc($users_result)) {
+                                            echo '<option value="' . $user['id'] . '">' . htmlspecialchars($user['nombre']) . '</option>';
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 d-flex align-items-end">
+                                    <button id="cargar-cambios-btn" class="btn btn-primary">
+                                        <i class="fas fa-search"></i> Cargar Estadísticas
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div id="cambios-usuario-container">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i> Selecciona un usuario para ver sus estadísticas de cambios de aceite.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar Select2 para los filtros
+    $('#user-search, #marca-search').select2({
+        theme: 'bootstrap-5',
+        allowClear: true
+    });
+    
+    // Inicializar DataTables solo si no está ya inicializada
+    let carsTable;
+    if (!$.fn.DataTable.isDataTable('#cars-table')) {
+        carsTable = $('#cars-table').DataTable({
+            language: {
+                url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json"
+            },
+            responsive: true,
+            order: [[0, "desc"]]
+        });
+    } else {
+        carsTable = $('#cars-table').DataTable();
+    }
+    
+    // Cargar usuarios
+    $.ajax({
+        url: 'api/index.php?resource=users',
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        success: function(data) {
+            if (data.success) {
+                const userSelect = document.getElementById('user-search');
+                data.users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.nombre;
+                    option.textContent = user.nombre;
+                    userSelect.appendChild(option);
+                });
+                
+                // Evento de cambio
+                $('#user-search').on('change', function() {
+                    const userName = this.value;
+                    
+                    if (userName) {
+                        carsTable.column(1).search(userName).draw();
+                    } else {
+                        carsTable.column(1).search('').draw();
+                    }
+                });
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("Error al cargar usuarios:", error);
+        }
+    });
+    
+    // Cargar marcas
+    $.ajax({
+        url: 'api/index.php?resource=cars&action=marcas',
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        success: function(data) {
+            if (data.success) {
+                const marcaSelect = document.getElementById('marca-search');
+                data.marcas.forEach(marca => {
+                    const option = document.createElement('option');
+                    option.value = marca;
+                    option.textContent = marca;
+                    marcaSelect.appendChild(option);
+                });
+                
+                // Evento de cambio
+                $('#marca-search').on('change', function() {
+                    const marca = this.value;
+                    
+                    if (marca) {
+                        carsTable.column(2).search(marca).draw();
+                    } else {
+                        carsTable.column(2).search('').draw();
+                    }
+                });
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("Error al cargar marcas:", error);
+        }
+    });
+    
+    // Cargar reportes iniciales
+    loadReport('usuarios');
+    loadReport('carros');
+    loadReport('mantenimiento');
+
+    // Cargar estadísticas de cambios de aceite por usuario
+    const cambiosUsuarioSelect = document.getElementById('cambios-usuario-select');
+    const cargarCambiosBtn = document.getElementById('cargar-cambios-btn');
+    const cambiosUsuarioContainer = document.getElementById('cambios-usuario-container');
+    
+    cargarCambiosBtn.addEventListener('click', function() {
+        const userId = cambiosUsuarioSelect.value;
+        
+        if (!userId) {
+            cambiosUsuarioContainer.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> Por favor, selecciona un usuario.
+                </div>
+            `;
+            return;
+        }
+        
+        // Mostrar loader
+        cambiosUsuarioContainer.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-secondary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <p class="mt-2">Cargando datos...</p>
+            </div>
+        `;
+        
+        // Cargar datos desde la API
+        $.ajax({
+            url: `api/index.php?resource=cars&action=cambios-aceite&id=${userId}`,
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                if (data.success) {
+                    const stats = data.stats;
+                    
+                    // Crear el contenido HTML
+                    let html = `
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card bg-light mb-3">
+                                    <div class="card-body text-center">
+                                        <h1 class="display-4">${stats.total_cambios}</h1>
+                                        <p class="lead">Cambios de Aceite Realizados</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light mb-3">
+                                    <div class="card-body text-center">
+                                        <h1 class="display-4">${stats.proximos_cambios}</h1>
+                                        <p class="lead">Próximos a Cambio</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light mb-3">
+                                    <div class="card-body text-center">
+                                        <h1 class="display-4">${stats.vehiculos.length}</h1>
+                                        <p class="lead">Vehículos Registrados</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    if (stats.vehiculos.length > 0) {
+                        html += `
+                            <div class="table-responsive mt-3">
+                                <table class="table table-striped table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Vehículo</th>
+                                            <th>Kilometraje</th>
+                                            <th>Cambios realizados</th>
+                                            <th>Próximo cambio</th>
+                                            <th>Estado</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                        `;
+                        
+                        stats.vehiculos.forEach(car => {
+                            html += `
+                                <tr>
+                                    <td>${car.marca} ${car.modelo}</td>
+                                    <td>${car.kilometraje.toLocaleString()} km</td>
+                                    <td>${car.contador_cambios}</td>
+                                    <td>${car.proximo_cambio.toLocaleString()} km</td>
+                                    <td>
+                            `;
+                            
+                            if (car.kilometraje >= car.proximo_cambio) {
+                                html += `<span class="badge bg-danger">Cambio pendiente</span>`;
+                            } else if (car.km_faltantes < 1000) {
+                                html += `<span class="badge bg-warning text-dark">Próximo (${car.km_faltantes} km)</span>`;
+                            } else {
+                                html += `<span class="badge bg-success">Al día (${car.km_faltantes} km)</span>`;
+                            }
+                            
+                            html += `
+                                    </td>
+                                    <td>
+                                        <a href="view_car.php?id=${car.id}&admin=1" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                        
+                        html += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="alert alert-warning mt-3">
+                                <i class="fas fa-exclamation-triangle"></i> Este usuario no tiene vehículos registrados.
+                            </div>
+                        `;
+                    }
+                    
+                    cambiosUsuarioContainer.innerHTML = html;
+                } else {
+                    cambiosUsuarioContainer.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle"></i> Error al cargar los datos: ${data.message}
+                        </div>
+                    `;
+                }
+            },
+            error: function(xhr, status, error) {
+                cambiosUsuarioContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> Error de conexión: ${error}
+                    </div>
+                `;
+            }
+        });
+    });
+});
+
+function loadReport(reportType) {
+    const reportContainer = document.getElementById(`${reportType === 'usuarios' ? 'users' : reportType === 'carros' ? 'cars' : 'maintenance'}-report`);
+    
+    // Mostrar spinner de carga
+    reportContainer.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-${reportType === 'usuarios' ? 'primary' : reportType === 'carros' ? 'success' : 'danger'}" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-2">Cargando datos...</p>
+        </div>
+    `;
+    
+    // Cargar datos desde la API
+    $.ajax({
+        url: `api/index.php?resource=reports&action=${reportType}`,
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        success: function(data) {
+            if (data.success) {
+                const stats = data.stats;
+                
+                switch (reportType) {
+                    case 'usuarios':
+                        reportContainer.innerHTML = `
+                            <p><strong>Total de usuarios:</strong> ${stats.total_usuarios}</p>
+                            <hr>
+                            <h6>Usuarios por rol:</h6>
+                            <ul>
+                                <li>Administradores: ${stats.usuarios_por_rol.admin || 0}</li>
+                                <li>Usuarios regulares: ${stats.usuarios_por_rol.usuario || 0}</li>
+                            </ul>
+                            <hr>
+                            <h6>Usuarios más recientes:</h6>
+                            <ul class="list-unstyled">
+                                ${stats.usuarios_recientes.map(user => 
+                                    `<li><i class="fas fa-user"></i> ${user.nombre} (${user.email})</li>`
+                                ).join('')}
+                            </ul>
+                        `;
+                        break;
+                        
+                    case 'carros':
+                        reportContainer.innerHTML = `
+                            <p><strong>Total de vehículos:</strong> ${stats.total_carros}</p>
+                            <hr>
+                            <h6>Vehículos por marca:</h6>
+                            <ul>
+                                ${Object.entries(stats.carros_por_marca).map(([marca, total]) => 
+                                    `<li>${marca}: ${total}</li>`
+                                ).join('')}
+                            </ul>
+                            <hr>
+                            <p><strong>Antigüedad promedio:</strong> ${stats.antiguedad_promedio} años</p>
+                            <p><strong>Kilometraje promedio:</strong> ${stats.kilometraje_promedio.toLocaleString()} km</p>
+                            <p><strong>Necesitan mantenimiento:</strong> ${stats.necesitan_mantenimiento}</p>
+                        `;
+                        break;
+                        
+                    case 'mantenimiento':
+                        reportContainer.innerHTML = `
+                            <h6>Estado de mantenimiento:</h6>
+                            <div class="progress mb-3" style="height: 30px;">
+                                <div class="progress-bar bg-success" style="width: ${Math.round(stats.estado_mantenimiento.al_dia / (stats.estado_mantenimiento.al_dia + stats.estado_mantenimiento.proximos + stats.estado_mantenimiento.atrasados) * 100)}%">
+                                    ${stats.estado_mantenimiento.al_dia}
+                                </div>
+                                <div class="progress-bar bg-warning" style="width: ${Math.round(stats.estado_mantenimiento.proximos / (stats.estado_mantenimiento.al_dia + stats.estado_mantenimiento.proximos + stats.estado_mantenimiento.atrasados) * 100)}%">
+                                    ${stats.estado_mantenimiento.proximos}
+                                </div>
+                                <div class="progress-bar bg-danger" style="width: ${Math.round(stats.estado_mantenimiento.atrasados / (stats.estado_mantenimiento.al_dia + stats.estado_mantenimiento.proximos + stats.estado_mantenimiento.atrasados) * 100)}%">
+                                    ${stats.estado_mantenimiento.atrasados}
+                                </div>
+                            </div>
+                            <ul class="list-unstyled">
+                                <li><span class="badge bg-success">Al día</span> ${stats.estado_mantenimiento.al_dia} vehículos</li>
+                                <li><span class="badge bg-warning text-dark">Próximos</span> ${stats.estado_mantenimiento.proximos} vehículos</li>
+                                <li><span class="badge bg-danger">Atrasados</span> ${stats.estado_mantenimiento.atrasados} vehículos</li>
+                            </ul>
+                            <hr>
+                            <h6>Vehículos que necesitan mantenimiento:</h6>
+                            <ul class="list-unstyled small">
+                                ${stats.vehiculos_mantenimiento.slice(0, 5).map(car => 
+                                    `<li><i class="fas fa-car"></i> ${car.marca} ${car.modelo} (${car.kilometraje.toLocaleString()} km)</li>`
+                                ).join('')}
+                                ${stats.vehiculos_mantenimiento.length > 5 ? `<li>... y ${stats.vehiculos_mantenimiento.length - 5} más</li>` : ''}
+                            </ul>
+                        `;
+                        break;
+                }
+            } else {
+                reportContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> Error al cargar el reporte: ${data.message}
+                    </div>
+                `;
+            }
+        },
+        error: function(xhr, status, error) {
+            reportContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i> Error de conexión: ${error}
+                </div>
+            `;
+        }
+    });
+}
+</script>
 
 <?php include 'includes/footer.php'; ?> 
